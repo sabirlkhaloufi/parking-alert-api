@@ -1,16 +1,29 @@
 import express from "express";
 import cors from "cors";
-import { Expo } from "expo-server-sdk";
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-const expo = new Expo({
-  accessToken: process.env.EXPO_ACCESS_TOKEN, // optional
-});
+let ExpoClass = null;
+let expo = null;
 
-// route test
+async function getExpo() {
+  if (!ExpoClass) {
+    const mod = await import("expo-server-sdk");
+    ExpoClass = mod.Expo;
+  }
+
+  if (!expo) {
+    expo = new ExpoClass({
+      accessToken: process.env.EXPO_ACCESS_TOKEN,
+    });
+  }
+
+  return { Expo: ExpoClass, expo };
+}
+
 app.get("/", (req, res) => {
   res.json({
     success: true,
@@ -18,9 +31,13 @@ app.get("/", (req, res) => {
   });
 });
 
-// send one push notification
+app.get("/favicon.ico", (req, res) => {
+  res.status(204).end();
+});
+
 app.post("/send-push", async (req, res) => {
   try {
+    const { Expo, expo } = await getExpo();
     const { to, title, body, data } = req.body;
 
     if (!to) {
@@ -70,15 +87,15 @@ app.post("/send-push", async (req, res) => {
   }
 });
 
-// optional: send many notifications
 app.post("/send-many-push", async (req, res) => {
   try {
+    const { Expo, expo } = await getExpo();
     const { notifications } = req.body;
 
     if (!Array.isArray(notifications) || notifications.length === 0) {
       return res.status(400).json({
         success: false,
-        error: "notifications must be a hhh non-empty array",
+        error: "notifications must be a non-empty array",
       });
     }
 
@@ -123,5 +140,4 @@ app.post("/send-many-push", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-
+export default app;
